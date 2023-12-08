@@ -80,7 +80,6 @@ def findStartEnd(data):
     return start, end
 
 def part1(data):
-    print("====")
     directions = data[0]
 
     stepMatrix = createStepMatrix(data)
@@ -118,18 +117,13 @@ def part2(data):
 
     stepMatrix = createStepMatrix(data)
     starts, ends = findAllStartEnd(data)
-    #print(starts)
-    #print(ends)
     currentNodes = starts
 
-    currentSteps = 0
     stepSize = len(directions)
 
 
     nodeCycles = []
     foundNodes = []
-    cycleStarts =[] 
-
     for node in starts:
         foundNodes.append([node])
 
@@ -149,7 +143,6 @@ def part2(data):
             if nextNode in foundNodes[i]:
                 cycleStart = foundNodes[i].index(nextNode)
                 nodeCycles.append(foundNodes[i][cycleStart:])
-                cycleStarts.append(cycleStart)
                 nextNodes.append(-1)
             else:
                 nextNodes.append(nextNode)
@@ -162,25 +155,8 @@ def part2(data):
 
 
     cycleLengths = [len(x) for x in nodeCycles]
-    
-    matchIndexAt = []
-    for i, cycle in enumerate(nodeCycles):
-        for end in ends:
-            if end in cycle:
-                matchIndexAt.append(cycle.index(end))
 
-    print("fn:", foundNodes)
-    print("nc:", nodeCycles)
-    print("cs:",cycleStarts)
-    print("ei:",matchIndexAt)
-    print("ss:",stepSize)
-
-    # implement chinese remainder
-    print("cr:")
-
-    
-
-    return currentSteps
+    return math.lcm(*cycleLengths)*stepSize
 
 
 def main(argv):
@@ -200,7 +176,7 @@ def main(argv):
         elif opt == "-d":
             debugMode = True
     
-    exampleFiles = [ "example3.txt", "example4.txt"]#"example.txt", "example2.txt",
+    exampleFiles = []
     problemFiles = ["input.txt"]
 
     problemFiles = problemFiles + exampleFiles if not onlyExample else exampleFiles
@@ -222,4 +198,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])
