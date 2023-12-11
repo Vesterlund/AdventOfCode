@@ -113,14 +113,10 @@ def canTakeStep(matrix, pos, direction):
     return recDiv in matrix[i][j]
 
 def searchForLoop(matrix,startIndex,direction):
-    
-    
-    
-
     currentIndex = startIndex
     currentStep = 0
     
-    loop = [(startIndex, 0)]
+    loop = [(startIndex, 0, [0,0])]
     
     while canTakeStep(matrix, currentIndex, direction):
         dir = directionToCoords(direction)
@@ -135,7 +131,7 @@ def searchForLoop(matrix,startIndex,direction):
         #print(currentValues,currentIndex, flipDir(direction))
         direction = currentValues[currentValues.index(flipDir(direction)) - 1]
         #print("dir: {}".format(direction))
-        loop.append((currentIndex, currentStep))
+        loop.append((currentIndex, currentStep, currentValues))
 
             
         
@@ -168,12 +164,57 @@ def part2(data):
     for step in loopSteps:
         point = step[0]
         
-        edges[point[0]][point[1]] = 1
+        pipeType = step[2]
 
-    print(edges)
-    
+        t = 1
+        match pipeType:
+            case [1,3]: # |
+                t = 2
+            case [1,2]: # L
+                t = 3
+            case [1,4]: # J
+                t = 4
+            case [3,4]: # 7
+                t = 5
+            case [2,3]: # F
+                t=6
+            case [0,0]: # Abuse the fact of knowing input S == J
+                t = 4
+            case _:
+                t = 1
 
-    return -1
+        edges[point[0]][point[1]] = t
+
+    inside = np.zeros_like(edges)
+
+    for i in range(1,len(edges)-1):
+        row = edges[i]
+        isInside = False
+        prevCurve = -1
+        for j in range(1, len(row)-1):
+            el = row[j]
+
+            if el in [6,3]:
+                prevCurve = el
+                continue
+
+            if prevCurve == 6 and el == 5:
+                prevCurve = -1
+            elif prevCurve == 6 and el == 4:
+                prevCurve = 4
+                isInside = not isInside
+            elif prevCurve == 3 and el == 5:
+                isInside = not isInside
+                prevCurve = el
+            elif prevCurve == 3 and el == 4:
+                prevCurve = -1   
+
+            if el == 2 :
+                isInside = not isInside
+            elif isInside and el==0:
+                inside[i][j] += 1
+
+    return np.count_nonzero(inside)
 
 
 def main(argv):
@@ -193,7 +234,7 @@ def main(argv):
         elif opt == "-d":
             debugMode = True
     
-    exampleFiles = ["example.txt", "example2.txt"]
+    exampleFiles = ["example3.txt"]
     problemFiles = ["input.txt"]
 
     problemFiles = problemFiles + exampleFiles if not onlyExample else exampleFiles
