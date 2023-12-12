@@ -23,98 +23,53 @@ def parseInput(filePath:str):
 
     return springInfo
 
+def recursivePlaceSpring(string, springSizeList, level = 0):
 
-def combinationCounter(springStr, springSizes):
-    
-    # Loop through the spring sizes trying to place them
-    # Offset the starting ? (or # in some measure) by one after each loop
-    # If some spring cannot be placed, the sequence is invalid
-    
     springCombinations = []
-    
-    for i, c in enumerate(springStr):
-        if c not in ["?"]:
-            continue
-        tempString = springStr[:i].replace("?",".") + springStr[i:]
-        
-        placedString = True
-        lastPlacedIndex = 0
-        
-        for spring in springSizes:
-            index = canPlaceSpring(tempString, spring, lastPlacedIndex)
-            
-            if index == -1: # If one spring cannot be placed, dont try the rest
-                placedString = False
-                break
-            
-            tempString = placeSpring(tempString, spring, index)
-            lastPlacedIndex = index + spring
-            
-        
-        if placedString:
-            springCombinations.append(tempString)
-        
-    
-    return springCombinations
 
-def springPlacementCombinations(substring, springSizes, level=0):
-    # See where we can place current spring
-    # If there are more springs left, recursive
-    # Place current spring, concat with recursive calls
-    
-    if not springSizes:
-        return [substring]
-    
-    springCombinations = []
-    prevChar = ""
-    lastSubsetIndex = 0
-    for i, c in enumerate(substring):
-        if c not in ["?", "#"] or prevChar == "#":
-            prevChar = c
-            continue
-        prevChar = c
-        
-        tempString = substring[:i] + substring[i:]
-        placedString = True
-        currentSpring = springSizes[0]
-        
-        index = canPlaceSpring(tempString, currentSpring, i)
+    stringLength = len(string)
+    springSum = sum(springSizeList)
 
-        if index == -1: # If one spring cannot be placed, dont try the rest
-            placedString = False
-            break
+    iChar = 0
+
+    while iChar < stringLength :
+        tempString = string
+        c = tempString[iChar]
+        #print(tempString)
+        if c == ".":
+            iChar += 1
+            continue
         
-        tempString =  placeSpring(tempString, currentSpring, index)
+
+        nextSpring = springSizeList[0]
+        nextSpringIndex = canPlaceSpring(tempString, nextSpring, iChar)
+
+        if nextSpringIndex == -1:
+            iChar += 1
+            continue
         
-        if placedString:
-            recursiveIndex = i +  currentSpring + 1
-            lastSubsetIndex = i + index +  currentSpring
+        tempString = placeSpring(tempString, nextSpring, nextSpringIndex)
+
+        if springSizeList[1:]:
+            splitIndex = nextSpringIndex + nextSpring + 1
+
+            affix = tempString[:splitIndex]
+
+            suffixes = recursivePlaceSpring(tempString[splitIndex:], springSizeList[1:], level=level+1)
             
-            recString = tempString[recursiveIndex:]
-            affix = tempString[:recursiveIndex]
-            
-            if level > -1:
-                print("{}{}: index: {}".format("  "*level,level, i), springSizes[1:])
-                print("{} string: ".format("  "*level), tempString)
-                print("{} Affix: ".format("  "*level), affix)
-                print("{} Suffixes: ".format("  "*level), recString)
-        
-            if not springSizes[1:]:
-                springCombinations.append(tempString)
-                continue
-        
-            suffixes = springPlacementCombinations(recString, springSizes[1:], level+1)
-            
-            
+            #if level==0: print(iChar,affix,tempString[splitIndex:],suffixes,  springSizeList[1:])
+            #if level==1: print("  ",iChar,affix,tempString[splitIndex:],suffixes,  springSizeList[1:])
             
             for suffix in suffixes:
-                
-                if False and level == 0 :
-                    print("{} {} suffixes:".format(level,i), suffixes)
-                    print("{} {} added:".format(level,i), tempString[:recursiveIndex] + suffix)
-                
-                springCombinations.append(affix + suffix)
-        
+                if (affix + suffix).count("#") <= springSum:
+                    springCombinations.append(affix + suffix)
+
+        else:
+            if tempString.count("#") <= springSum:
+                springCombinations.append(tempString)
+
+        iChar += 1
+    
     return springCombinations
 
 def placeSpring(springStr, springSize, index):
@@ -129,23 +84,21 @@ def canPlaceSpring(springStr, springSize, offset):
     # Return true/false and index/-1 of where it can be placed
      
     #print("s:",springStr, springSize)
-    for i, c in enumerate(springStr[offset:]):
-        iOff = i + offset
-        #print(i, iOff, c)
-        if c in ["?", "#"]:
-            springSubset = springStr[iOff:iOff+springSize]
-            if "." in springSubset:
-                continue
-            
-            afterChar = springStr[iOff+springSize]
-            #print(springSubset, afterChar)
-            if afterChar in ["?", "."]:
-                return iOff
-            else:
-                continue
-                
-            
     
+    iOff = offset
+    c = springStr[iOff]
+    #print(i, iOff, c)
+    if c in ["?", "#"]:
+        springSubset = springStr[iOff:iOff+springSize]
+        if "." in springSubset:
+            return -1
+        
+        afterChar = springStr[iOff+springSize]
+        beforeChar = springStr[iOff - 1]
+        #print(beforeChar, springSubset, afterChar)
+        if afterChar in ["?", "."] and beforeChar != "#":
+            return iOff
+            
     return -1
 
 
@@ -157,16 +110,16 @@ def part1(data):
         
         paddedString = "."+s[0]+"."
         #springCombinations = combinationCounter(paddedString, s[1])
-        print("====",paddedString, s[1])
-        comb = springPlacementCombinations(paddedString, s[1])
-        print("====",paddedString, s[1], len(comb))
-        
+        #print("====",paddedString, s[1])
+        comb = recursivePlaceSpring(paddedString, tuple(s[1]))
+
         numComb += len(comb)
         
     return numComb
 
 def part2(data):
     return
+    
 
 
 def main(argv):
@@ -197,7 +150,7 @@ def main(argv):
         
         if not noPartTwo:
             result = part2(data)
-            print("{} - Part 2: Sum of shortest distances {}".format(file, result))
+            print("{} - Part 2: {} combinations that meet the criteria".format(file, result))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
