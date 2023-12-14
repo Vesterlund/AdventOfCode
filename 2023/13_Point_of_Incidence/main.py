@@ -26,11 +26,11 @@ def parseInput(filePath:str):
     return npPatterns
 
 def hashRow(row):
-    
     return sum([x*2**i for i,x in enumerate(row)])
 
 def findMirror(row):
     rowLength = len(row)
+    mirrorIndex = []
     for mirrorPos in range(1, rowLength):
         mirroredElements = min(mirrorPos, rowLength - mirrorPos)
         
@@ -40,9 +40,12 @@ def findMirror(row):
         frontElements.reverse()
         
         if all(f == b for f,b in zip(frontElements, backElements)):
-            return mirrorPos
+            mirrorIndex.append(mirrorPos)
     
-    return -1
+    if not mirrorIndex:
+        return [-1]
+    
+    return mirrorIndex
 
 def findValidMirror(pattern):
     rowIndex = findMirror(cHashRow(pattern))
@@ -54,22 +57,24 @@ def cHashRow(pattern):
     return [hashRow(row) for row in pattern]
 
 def fixSmudge(pattern, originalReflectation):
-    # What smudges can be changed to produce a different reflection line?
-    #print(pattern)
     
-    validMirrors = []
-    earliestMirrorIndex = np.Inf
-
     for i in range(0,len(pattern)):
         for j in range(0, len(pattern[0])):
             diff = np.copy(pattern)
             diff[i][j] = 1 - diff[i][j]
-            
+                        
             vRow, vCol = findValidMirror(diff)
-            
-            if (vRow not in [-1, originalReflectation[0]]) or (vCol not in [-1, originalReflectation[1]]):
-                return np.copy(diff)
 
+            for row in vRow:
+                if (row not in [-1, originalReflectation[0]]):
+                    return np.copy(diff), True
+            
+            for col in vCol:
+                if col not in [-1, originalReflectation[1]]:
+                    return np.copy(diff), True
+    
+    return pattern, False
+    
 # Find mirror
 def part1(data):
     mirrorScore = 0
@@ -77,32 +82,36 @@ def part1(data):
     for pattern in data:
        
         rowMirrorIndex, colMirrorIndex = findValidMirror(pattern)
-    
-        if rowMirrorIndex != -1:
-            mirrorScore += 100*rowMirrorIndex
+
+        if -1 not in rowMirrorIndex:
+            mirrorScore += 100*rowMirrorIndex[0]
             
-        if colMirrorIndex != -1:
-            mirrorScore += colMirrorIndex
+        if -1 not in colMirrorIndex:
+            mirrorScore += colMirrorIndex[0]
     
     return mirrorScore
 
 def part2(data):
     mirrorScore = 0
     
-    for i,pattern in enumerate(data):
-        print(i,pattern)
+    for pattern in data:
         oRowIndex, oColIndex = findValidMirror(pattern)
-        pattern = fixSmudge(pattern, (oRowIndex, oColIndex))
+        oRowIndex, oColIndex = oRowIndex[0],oColIndex[0]
+        
+        pattern, hasReflection = fixSmudge(pattern, (oRowIndex, oColIndex))
+        
+        if not hasReflection:
+            continue
         
         nRowIndex, nColIndex = findValidMirror(pattern)
         
-        if nRowIndex not in [-1, oRowIndex]:
-            mirrorScore += 100*nRowIndex
+        for ri in nRowIndex:
+            if ri not in [-1, oRowIndex]:
+                mirrorScore += 100*ri
             
-        if nColIndex not in [-1, oColIndex]:
-            mirrorScore += nColIndex
-            
-        
+        for ci in nColIndex:
+            if ci not in [-1, oColIndex]:
+                mirrorScore += ci
         
     return mirrorScore
     
