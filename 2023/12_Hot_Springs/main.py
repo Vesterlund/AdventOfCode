@@ -101,6 +101,103 @@ def canPlaceSpring(springStr, springSize, offset):
             
     return -1
 
+import re
+def recursivePlaceSpring(string, springSizeList, level = 0):
+
+    springCombinations = []
+
+    stringLength = len(string)
+    springSum = sum(springSizeList)
+
+    iChar = 0
+
+    while iChar < stringLength :
+        tempString = string
+        c = tempString[iChar]
+        #print(tempString)
+        if c == ".":
+            iChar += 1
+            continue
+        
+
+        nextSpring = springSizeList[0]
+        nextSpringIndex = canPlaceSpring(tempString, nextSpring, iChar)
+
+        if nextSpringIndex == -1:
+            iChar += 1
+            continue
+        
+        tempString = placeSpring(tempString, nextSpring, nextSpringIndex)
+
+        if springSizeList[1:]:
+            splitIndex = nextSpringIndex + nextSpring + 1
+
+            affix = tempString[:splitIndex]
+
+            suffixes = recursivePlaceSpring(tempString[splitIndex:], springSizeList[1:], level=level+1)
+            
+            #if level==0: print(iChar,affix,tempString[splitIndex:],suffixes,  springSizeList[1:])
+            #if level==1: print("  ",iChar,affix,tempString[splitIndex:],suffixes,  springSizeList[1:])
+            
+            for suffix in suffixes:
+                if (affix + suffix).count("#") <= springSum:
+                    springCombinations.append(affix + suffix)
+
+        else:
+            if tempString.count("#") <= springSum:
+                springCombinations.append(tempString)
+
+        iChar += 1
+    
+    return springCombinations
+
+def checkString(string, springSize):
+    #print(string, springSize, all([len(x) == spring for x,spring in zip(re.findall("#+", string),springSize)]))
+    
+    springGroups = re.findall("#+", string)
+    
+    if len(springGroups) != len(springSize):
+        return False
+    
+    return all([len(x) == spring for x,spring in zip(re.findall("#+", string),springSize)]) and not "?" in string
+
+import functools
+@functools.cache
+def recursiveTreeString(string, springSize,start=0, level=0):
+    if not springSize:
+        return "#" not in string
+    
+    if not string:
+        return 0
+    
+    c = string[0]
+    spring = springSize[0]
+    
+    
+    def dot():
+        return recursiveTreeString(string[1:], springSize)
+    
+    def pound():
+        group = string[:spring].replace("?","#") 
+        
+        if "." in group:
+            return 0
+        
+        if len(string) == spring:
+            return 1 if len(springSize) == 1 else 0    
+
+        if string[spring] in ".?":
+            return recursiveTreeString(string[spring+1:], springSize[1:])
+        
+        return 0
+    
+    match c:
+        case "#":
+            return pound()
+        case ".":
+            return dot()
+        case "?":
+            return pound() + dot()
 
 def part1(data):
     
@@ -118,7 +215,15 @@ def part1(data):
     return numComb
 
 def part2(data):
-    return
+    numComb = 0
+
+    for s in data:
+        paddedString = "."+s[0]+"?{}".format(s[0])+"?{}".format(s[0])+"?{}".format(s[0])+"?{}".format(s[0])+"."
+        comb = recursiveTreeString(paddedString, tuple(s[1]*5))
+
+        numComb += comb
+        
+    return numComb
     
 
 
