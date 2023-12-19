@@ -14,6 +14,7 @@ def readFile(filepath:str):
 
 class Part():
     def __init__(self, l) -> None:
+        l = list(map(int,l))
         self.x = l[0]
         self.m = l[1]
         self.a = l[2]
@@ -21,12 +22,15 @@ class Part():
         
     def __str__(self) -> str:
         return "x={}, m={}, a={}, s={}".format(self.x,self.m,self.a,self.s)
+    
+    def sum(self) -> int:
+        return self.x + self.m + self.a + self.s
 
 class Instruction():
     
     def __init__(self, var, val, op, trueRes) -> None:
         self.var = var
-        self.val = val
+        self.val = int(val)
         self.op = op
         self.trueRes = trueRes
         
@@ -40,7 +44,30 @@ class Instruction():
             case "s": pVal = p.s
         
         return pVal < self.val if self.op == "<" else pVal > self.val
-             
+    
+    def modifyRange(self, r):
+        pos = 0 if self.op == ">" else 1
+        i = 0
+        match self.var:
+            case "x": i = 0
+            case "m": i = 1
+            case "a": i = 2
+            case "s": i = 3
+
+        trueRange = copy.deepcopy(r)
+        falseRange = copy.deepcopy(r)
+
+        trueRange[self.var][pos] = self.val + (-1 if pos else 1)
+        falseRange[self.var][(pos + 1) % 2] = self.val
+
+        return trueRange, falseRange
+
+    def __hash__(self) -> int:
+        return hash((self.var,self.val, self.op, self.trueRes))
+
+    def __str__(self) -> str:
+        return "{} {} {} -> {}".format(self.var, self.op, self.val, self.trueRes)
+import copy 
 
 class WorkFlow():
     instructions= []
@@ -58,6 +85,22 @@ class WorkFlow():
                 return ins.trueRes
 
         return self.finalDest
+    
+    def createRanges(self, r):
+        cR = copy.deepcopy(r)
+        outRanges = []
+        for ins in self.instructions:
+            a, cR = ins.modifyRange(cR)
+            outRanges.append((ins.trueRes,a))
+        outRanges.append((self.finalDest,cR))
+        return outRanges
+
+    def __str__(self) -> str:
+        rString = ""
+        for ins in self.instructions:
+            rString += str(ins) + "\n"
+        
+        return rString + "finally: {}".format(self.finalDest)
         
 def parseInput(filePath:str):
     fileContent = readFile(filePath)
@@ -68,7 +111,7 @@ def parseInput(filePath:str):
     instructions = data[0].split("\n")
     partList = data[1].split("\n")
     
-    workDict = {}
+    workDict = dict()
     
     for ins in instructions:
         a = ins.split("{")
@@ -77,25 +120,75 @@ def parseInput(filePath:str):
         
         temp = []
         for ti in i[:-1]:
-            temp.append(Instruction()
+            op = "<" if "<" in ti else ">"
+            c = ti.split(op)
+            v = c[1].split(":")
+            temp.append(Instruction(c[0], v[0],op,v[1]))
         
-        print(a)
+        work = WorkFlow(temp, i[-1][:-1])
+        workDict[a[0]] = work
     
     parts = []
     for sPart in partList:
         t = [int(x) for x in re.findall(r"(\d+)", sPart)]
         parts.append(Part(t))
-    
-    for p in parts:
-        print(p)
-    
-    return 
+
+    return workDict, parts
 
 
 def part1(data):
-    return
+    workDict, parts = data
+
+    totalSum = 0
+    
+    for p in parts:
+        startIns = "in"
+        currIns = startIns
+
+        while currIns not in ["A", "R"]:
+            currFlow : WorkFlow = workDict[currIns]
+            currIns = currFlow.findResult(p)
+
+        if currIns == "A":
+            totalSum += p.sum()
+
+    return totalSum
+
 def part2(data):
-    return
+    workDict, _ = data
+    ranges = {
+        "x": [1,4000],
+        "m": [1,4000],
+        "a": [1,4000],
+        "s": [1,4000]
+    }
+    currKey = "in"
+
+    ranges = workDict[currKey].createRanges(ranges)
+
+    finalRanges = []
+    tempRanges = ranges
+    while tempRanges:
+        tempRanges = []
+        for k, r in ranges:
+            if k == "A":
+                finalRanges.append(r)
+                continue
+            elif k== "R":
+                continue
+            
+            t = workDict[k].createRanges(r)
+            tempRanges += t
+
+        ranges = tempRanges
+
+    totalComb = 0
+    for fr in finalRanges:
+        m = 1
+        for key in fr:
+            m *= fr[key][1] - fr[key][0]+1
+        totalComb += m
+    return totalComb
     
 
 def main(argv):
@@ -128,11 +221,11 @@ def main(argv):
 
         if not noPartOne:
             result = part1(data)
-            print("{} - Part 1: {} cubic meters".format(file, result))
+            print("{} - Part 1: {} Total ratings for all parts  ".format(file, result))
         
         if not noPartTwo:
             result = part2(data)
-            print("{} - Part 2: {} cubic meters".format(file, result))
+            print("{} - Part 2: {} Total different part combinations ".format(file, result))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
