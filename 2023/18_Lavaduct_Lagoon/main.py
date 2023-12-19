@@ -36,116 +36,6 @@ def parseInput(filePath:str):
         
     return instructions, xBound, yBound
 
-from operator import add
-
-def diffCoordCalc(dir, step):
-    
-    c = [0,0]
-    
-    match dir:
-        case "R":
-            c[1] = step
-        case "L":
-            c[1] = -step
-        case "U":
-            c[0] = -step
-        case "D":
-            c[0] = step
-    
-    
-    return c
-
-def cornerType(pDir, dir):
-    match pDir:
-        case "R":
-            return -1 if dir == "D" else -2
-        case "D":
-            return -2 if dir == "L" else -4
-        case "L":
-            return -3 if dir == "D" else -4
-        case "U":
-            return -1 if dir == "L" else -3
-
-import sys
-
-def constructGrid(instructions, xBound, yBound):
-    grid = np.zeros((xBound*2+1, yBound*2+1))
-    
-    startPoint = (xBound, yBound)
-
-    grid[startPoint] = 1
-    
-    currPoint = list(startPoint)
-    
-    prevDir = None
-    
-    minX, maxX = startPoint[0],startPoint[0]
-    minY, maxY = startPoint[1],startPoint[1]
-    
-    for ins in instructions:
-        dir, step, col = ins
-        nextPoint = tuple(map(add, currPoint, diffCoordCalc(dir, step)))
-        
-        xC = [currPoint[0], nextPoint[0]]
-        xC.sort()
-        yC = [currPoint[1], nextPoint[1]]
-        yC.sort()
-        
-        grid[xC[0]:xC[1]+1, yC[0]:yC[1]+1] = 1
-        
-        if prevDir:
-            a = xC[1] if dir == "U" else xC[0]
-            b = yC[1] if dir == "L" else yC[0]
-            grid[a,b] = cornerType(prevDir, dir)
-        
-        currPoint = list(nextPoint)
-        prevDir = dir
-        minX = min(minX, currPoint[0])
-        minY = min(minY, currPoint[1])
-        maxX = max(maxX, currPoint[0])
-        maxY = max(maxY, currPoint[1])
-    
-    grid[startPoint] = cornerType(prevDir, instructions[0][0])
-    
-    grid = grid[minX:maxX+1, minY:maxY+1]
-    
-    return grid
-
-
-def fillGrid(grid):
-    
-    filledGrid = np.copy(grid)
-    
-    for i,row in enumerate(grid):
-        isInside  = False
-        isInWall = False
-        lastCorner = 0
-        
-        for j,element in enumerate(row):
-            
-            if element < 0:
-                isInWall = not isInWall
-                
-                if lastCorner == 0:
-                    lastCorner = element
-                else:
-                    if lastCorner == -3:
-                        isInside = not isInside if element == -2 else isInside
-                    elif lastCorner == -4:
-                        isInside = not isInside if element == -1 else isInside
-                    lastCorner = 0
-                    isInWall = False
-                    continue
-            
-            if element == 1 and not isInWall:
-                isInside = not isInside
-            
-            
-            if isInside:
-                filledGrid[i,j] = 1
-        
-    
-    return filledGrid
 
 def intToDir(x):
     match x:
@@ -154,38 +44,79 @@ def intToDir(x):
         case 2: return "L"
         case 3: return "U"
 
-def part1(data):
-    
-    grid = constructGrid(*data)
-    filledGrid = fillGrid(grid)
+def calcEndPoint(curr : list, dir, steps):
+    ep = curr.copy()
+    match dir:
+        case "U": ep[1] -= steps
+        case "R": ep[0] += steps
+        case "D": ep[1] += steps
+        case "L": ep[0] -= steps
 
-    return np.count_nonzero(filledGrid)
+    return ep
+
+def constructCornerGraph(instructions):
+    startPoint = [0,0]
+    pCurr = startPoint
+    pointList = []
+    pointList.append(startPoint)
+
+    for ins in instructions:
+        dir, steps,_ = ins
+
+        pEnd = calcEndPoint(pCurr, dir, steps)
+        pointList.append(pEnd)
+
+        pCurr = pEnd
+
+    return pointList
+
+def perimiterLength(instructions):
+    length = 0
+
+    for ins in instructions:
+        _, steps, _ = ins
+        length += steps
+
+    return length
+
+def shoelace(x_y):
+    x_y = np.array(x_y, dtype=np.int64)
+    x_y = x_y.reshape(-1,2)
+
+    x = x_y[:,0]
+    y = x_y[:,1]
+
+    S1 = np.sum(x*np.roll(y,-1))
+    S2 = np.sum(y*np.roll(x,-1))
+
+    area = .5*np.absolute(S1 - S2)
+
+    return area
+
+def solve(ins):
+    cornerGraph = constructCornerGraph(ins)
+    cornerGraph.reverse()
+    # Compensate for shoelace algorithm working with "center" of our squares
+    return int(shoelace(cornerGraph) + perimiterLength(ins) / 2 + 1)
+
+def part1(data):
+    ins,_,_ = data
+
+    
+    return solve(ins)
 
 def part2(data):
-    
-    # Need to be clever, cannot allocate 69.6 TiB
-    
     ins,_,_ = data
-    print(ins)
-    xBound = 0
-    yBound = 0
     instructions = []
     for i in ins:
         _, _, c = i
         
         direction = intToDir(int(c[-2]))
         nSteps = int(c[2:-2],16)
-        instructions.append((direction, nSteps))
-        
-        match direction:
-            case "R":
-                yBound += nSteps
-            case "D":
-                xBound += nSteps
+        instructions.append((direction, nSteps, ""))
 
-    return
+    return solve(instructions)
     
-
 
 def main(argv):
     noPartOne = False
@@ -221,7 +152,7 @@ def main(argv):
         
         if not noPartTwo:
             result = part2(data)
-            print("{} - Part 2: Maximum energized tiles {}".format(file, result))
+            print("{} - Part 2: {} cubic meters".format(file, result))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
