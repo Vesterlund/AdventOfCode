@@ -17,7 +17,6 @@ class Module(object):
     def __init__(self, name, output) -> None:
         self.name = name
         self.output = []
-        self.lastPulse = 0
 
         for out in output.split(","):
             self.output.append(out.strip())
@@ -76,27 +75,33 @@ class FlipFlop(Module):
 
 class ConjunctionModule(Module):
     def __init__(self, *args) -> None:
-        self.lastPulses = {}
+        self.inputConnections = []
+        self.outPulse = 0
         super().__init__(*args)
 
-    def receivePulse(self, pulseSender, pulse):
-        self.lastPulses[pulseSender] = pulse
+    def updateOutPulse(self,moduleDict):
+        
+        ifHigh = False
+        ifLow = False
+        print("     Updating conj:", self.name)
+        for key in self.inputConnections:
+            val = moduleDict[key]['lastPulse']
+            print("    ", key, val)
+            if val == 1:
+                ifHigh = True
+            elif val == 0:
+                ifLow = True
+        rVal = 0
+        if ifHigh+ifLow == 2: rVal = 0
+        else: rVal = -1 if ifHigh else 1
+        print("    ", self.name, " : Updating to ", rVal)
 
+        self.outPulse = rVal
+    
+
+    
     def transmitPulse(self, pulseSender, pulse):
-        self.receivePulse(pulseSender, pulse)
-
-        foundLow = False
-        foundHigh = False
-
-        for key in self.lastPulses:
-            match self.lastPulses[key]:
-                case 1: foundHigh = True
-                case -1: foundLow = True
-            
-        if foundHigh + foundLow == 2:
-            return 0
-
-        return -1 if foundHigh else 1
+        return self.outPulse
 
 import copy
 
@@ -112,21 +117,28 @@ def parseInput(filePath:str):
         parts = row.split("->")
 
         if parts[0][0] == "%":
-            moduleDict[parts[0][1:].strip()] = FlipFlop(parts[0][1:],parts[1])
+            moduleDict[parts[0][1:].strip()] = {'mod': FlipFlop(parts[0][1:],parts[1]), 'lastPulse':-1}
         elif parts[0][0] == "&":
-            moduleDict[parts[0][1:].strip()] = ConjunctionModule(parts[0][1:],parts[1])
+            moduleDict[parts[0][1:].strip()] = {'mod': ConjunctionModule(parts[0][1:],parts[1]), 'lastPulse':-1}
         elif parts[0][0] == "b":
-            moduleDict[parts[0].strip()] = BroadCaster(parts[0],parts[1])
+            moduleDict[parts[0].strip()] = {'mod': BroadCaster(parts[0],parts[1]), 'lastPulse':-1}
 
     # send default low pulse to set conj modules
     tempDict = copy.deepcopy(moduleDict)
-
     for key in tempDict:
-        for out in tempDict[key]:
+        for out in tempDict[key]["mod"].output:
             if out not in tempDict:
-                moduleDict[out] = TestModule(out, "")
-            moduleDict[out].receivePulse(key, -1)
+                moduleDict[out] = {'mod': TestModule(out, ""), 'lastPulse':0}
+            moduleDict[out]['mod'].receivePulse(key, -1)
+        
+    for key in moduleDict:
+        for k2 in moduleDict[key]["mod"].output:
+            if not k2:
+                continue
+            if isinstance(moduleDict[k2]['mod'], ConjunctionModule):
+                moduleDict[k2]['mod'].inputConnections.append(key)
 
+    
     return moduleDict
 
 def pushButton(moduleDict):
@@ -136,8 +148,7 @@ def pushButton(moduleDict):
 
     start = "broadcaster"
     startPulse = -1
-
-    sendQueue = [(start, [(startPulse, r) for r in moduleDict[start]])]
+    sendQueue = [(start, [(startPulse, r) for r in moduleDict[start]['mod']])]
     while sendQueue:
         #print(sendQueue)
         pulseGroup = sendQueue.pop(0)
@@ -149,22 +160,32 @@ def pushButton(moduleDict):
             else:
                 lowPulses += 1
 
-            print(sender, pulse, " -> ", rec)
-            temp = moduleDict[rec].transmitPulse(sender, pulse)
-            print("  {} sends pulse {} to {}".format(rec, temp, [x for x in moduleDict[rec]]))
+           
+            
+            
+            if isinstance(moduleDict[sender]['mod'], ConjunctionModule):
+                print("cnojmod: ", sender)
+                moduleDict[sender]['mod'].updateOutPulse(moduleDict)
+                pulse = moduleDict[sender]['mod'].outPulse
+            
+            temp = moduleDict[rec]['mod'].transmitPulse(sender, pulse)
+            print(sender, pulse, " -> ", rec, " ({})".format(temp))
+            moduleDict[rec]['lastPulse'] = temp
+            #print("  {} sends pulse {} to {}".format(rec, temp, [x for x in moduleDict[rec]['mod']]))
             if temp == 0:
                 continue
 
             
-            sendQueue += [(rec,[(temp, r) for r in moduleDict[rec]])]
+            sendQueue += [(rec,[(temp, r) for r in moduleDict[rec]['mod']])]
 
-        if isinstance(moduleDict[sender], FlipFlop):
-            moduleDict[sender].flip()
+        if isinstance(moduleDict[sender]['mod'], FlipFlop):
+            moduleDict[sender]['mod'].flip()
 
     return lowPulses, highPulses
 
 def part1(data):
     moduleDict = data
+    print(moduleDict)
 
     print(pushButton(moduleDict))
 
