@@ -2,6 +2,7 @@ import sys, getopt
 import numpy as np
 import math
 import re
+from enum import Enum
 
 
 def readFile(filepath:str):
@@ -12,12 +13,18 @@ def readFile(filepath:str):
 
     return fileContent
 
+State = Enum("State", ["HIGH", "LOW"])
+buttonPresses = 0
+
 class Module(object):
 
     def __init__(self, name, output) -> None:
         self.name = name
         self.output = []
 
+        if not output:
+            return
+        
         for out in output.split(","):
             self.output.append(out.strip())
     
@@ -38,7 +45,7 @@ class Module(object):
     def getOutputModules(self):
         return self.output
     
-    def receivePulse(self, pulseSender, pulse):
+    def receivePulse(self, pulse):
         return
 
     def __str__(self) -> str:
@@ -49,14 +56,14 @@ class BroadCaster(Module):
     def __init__(self, *args) -> None:
         super().__init__(*args)
 
-    def transmitPulse(self, pulseSender, pulse):
-        return -1
+    def transmitPulse(self, pulse):
+        return State.LOW
 
-class TestModule(Module):
+class MachineModule(Module):
     def __init__(self, *args) -> None:
         super().__init__(*args)
 
-    def transmitPulse(self,pulseSender, pulse):
+    def transmitPulse(self, pulse):
         return 0
 
 class FlipFlop(Module):
@@ -64,9 +71,9 @@ class FlipFlop(Module):
         self.isOn = False
         super().__init__(*args)
 
-    def transmitPulse(self, pulseSender, pulse):
-        if pulse == -1:
-            return 1 if not self.isOn else -1
+    def transmitPulse(self, pulse):
+        if pulse == State.LOW:
+            return State.HIGH if self.isOn else State.LOW
 
         return 0
     
@@ -75,33 +82,23 @@ class FlipFlop(Module):
 
 class ConjunctionModule(Module):
     def __init__(self, *args) -> None:
-        self.inputConnections = []
+        self.pulseMemory = {}
+        self.highPulse = {}
         self.outPulse = 0
         super().__init__(*args)
 
-    def updateOutPulse(self,moduleDict):
-        
-        ifHigh = False
-        ifLow = False
-        print("     Updating conj:", self.name)
-        for key in self.inputConnections:
-            val = moduleDict[key]['lastPulse']
-            print("    ", key, val)
-            if val == 1:
-                ifHigh = True
-            elif val == 0:
-                ifLow = True
-        rVal = 0
-        if ifHigh+ifLow == 2: rVal = 0
-        else: rVal = -1 if ifHigh else 1
-        print("    ", self.name, " : Updating to ", rVal)
+    def updateMemory(self,sender, pulse):
+        #print("     Updating:", self.name, "{}:{}".format(sender, pulse))
+        self.pulseMemory[sender] = pulse
 
-        self.outPulse = rVal
+        if pulse == State.HIGH and self.highPulse[sender] == 0:
+            self.highPulse[sender] = buttonPresses
     
+    def allHaveBeenHigh(self):
+        return all(self.highPulse.values())
 
-    
-    def transmitPulse(self, pulseSender, pulse):
-        return self.outPulse
+    def transmitPulse(self, pulse):
+        return State.LOW if all([self.pulseMemory[k] == State.HIGH for k in self.pulseMemory]) else State.HIGH
 
 import copy
 
@@ -117,84 +114,122 @@ def parseInput(filePath:str):
         parts = row.split("->")
 
         if parts[0][0] == "%":
-            moduleDict[parts[0][1:].strip()] = {'mod': FlipFlop(parts[0][1:],parts[1]), 'lastPulse':-1}
+            moduleDict[parts[0][1:].strip()] = {'mod': FlipFlop(parts[0][1:],parts[1]), 'lastReceived':State.LOW, "currentPress":0}
         elif parts[0][0] == "&":
-            moduleDict[parts[0][1:].strip()] = {'mod': ConjunctionModule(parts[0][1:],parts[1]), 'lastPulse':-1}
+            moduleDict[parts[0][1:].strip()] = {'mod': ConjunctionModule(parts[0][1:],parts[1]), 'lastReceived':State.LOW, "currentPress":0}
         elif parts[0][0] == "b":
-            moduleDict[parts[0].strip()] = {'mod': BroadCaster(parts[0],parts[1]), 'lastPulse':-1}
+            moduleDict[parts[0].strip()] = {'mod': BroadCaster(parts[0],parts[1]), 'lastReceived':State.LOW, "currentPress":0}
 
     # send default low pulse to set conj modules
     tempDict = copy.deepcopy(moduleDict)
     for key in tempDict:
         for out in tempDict[key]["mod"].output:
             if out not in tempDict:
-                moduleDict[out] = {'mod': TestModule(out, ""), 'lastPulse':0}
-            moduleDict[out]['mod'].receivePulse(key, -1)
+                moduleDict[out] = {'mod': ConjunctionModule(out, ""), 'lastReceived':State.LOW, "currentPress":0}
         
     for key in moduleDict:
         for k2 in moduleDict[key]["mod"].output:
             if not k2:
                 continue
             if isinstance(moduleDict[k2]['mod'], ConjunctionModule):
-                moduleDict[k2]['mod'].inputConnections.append(key)
+                moduleDict[k2]['mod'].pulseMemory[key] = State.LOW
+                moduleDict[k2]['mod'].highPulse[key] = 0
 
     
     return moduleDict
 
 def pushButton(moduleDict):
 
-    lowPulses = 1 # initial pulse
+    lowPulses = 0
     highPulses = 0
 
-    start = "broadcaster"
-    startPulse = -1
-    sendQueue = [(start, [(startPulse, r) for r in moduleDict[start]['mod']])]
+    for k in moduleDict:
+            moduleDict[k]["currentPress"] = 0
+
+    start = "button"
+    startPulse = State.LOW
+    sendQueue = [("broadcaster", startPulse, start)]
+    machinePulsesReceived = 0
+
     while sendQueue:
-        #print(sendQueue)
+        
         pulseGroup = sendQueue.pop(0)
-        sender = pulseGroup[0]
-        for pulsese  in pulseGroup[1]:
-            pulse, rec = pulsese
-            if pulse == 1:
+        receiver = pulseGroup[0]
+        pulse = pulseGroup[1]
+        sender = pulseGroup[2]
+
+        if pulse == State.HIGH:
                 highPulses += 1
-            else:
-                lowPulses += 1
+        else:
+            lowPulses += 1
 
-           
-            
-            
-            if isinstance(moduleDict[sender]['mod'], ConjunctionModule):
-                print("cnojmod: ", sender)
-                moduleDict[sender]['mod'].updateOutPulse(moduleDict)
-                pulse = moduleDict[sender]['mod'].outPulse
-            
-            temp = moduleDict[rec]['mod'].transmitPulse(sender, pulse)
-            print(sender, pulse, " -> ", rec, " ({})".format(temp))
-            moduleDict[rec]['lastPulse'] = temp
-            #print("  {} sends pulse {} to {}".format(rec, temp, [x for x in moduleDict[rec]['mod']]))
-            if temp == 0:
-                continue
+        receivingModule = moduleDict[receiver]["mod"]
+        
+        if isinstance(receivingModule, FlipFlop) and pulse == State.LOW:
+            #print("Flip!")
+            receivingModule.flip()
 
-            
-            sendQueue += [(rec,[(temp, r) for r in moduleDict[rec]['mod']])]
+        if isinstance(receivingModule, ConjunctionModule):
+            #print("cnojmod: ", receiver)
+            receivingModule.updateMemory(sender, pulse)
+        
+        if isinstance(receivingModule, MachineModule):
+            machinePulsesReceived+= 1
 
-        if isinstance(moduleDict[sender]['mod'], FlipFlop):
-            moduleDict[sender]['mod'].flip()
+        nexPulse = receivingModule.transmitPulse(pulse)
 
-    return lowPulses, highPulses
+        moduleDict[receiver]["lastReceived"] = pulse
+        moduleDict[receiver]["currentPress"] = nexPulse
+
+        if nexPulse == 0:
+            continue
+
+        sendQueue += [(x, nexPulse, receiver) for x in receivingModule.output]
+  
+    return lowPulses, highPulses, (machinePulsesReceived == 1)
 
 def part1(data):
     moduleDict = data
-    print(moduleDict)
+    totalLow = 0
+    totalHigh = 0
 
-    print(pushButton(moduleDict))
+    for i in range(0,1000):
+        lo, hi, _ = pushButton(moduleDict)
+        totalLow+= lo
+        totalHigh += hi
 
+    return totalLow*totalHigh
 
-    return 0
+from math import lcm
 
 def part2(data):
-    return
-    
+    # Doing some input digging:
+    # only hb -> rx
+    # js  -> hb
+    # zb  -> hb
+    # bs  -> hb
+    # rr  -> hb
+
+
+    # Now the keys areall appearing in some large output array
+    # Want to find cycle of these keys 
+
+    # Hb is & -> all senders to hb must be 1 for it to send a low pulse
+ 
+    moduleDict = data  
+
+    global buttonPresses
+
+    buttonPresses += 1
+
+    while True:
+        pushButton(moduleDict)
+        
+        if moduleDict["hb"]["mod"].allHaveBeenHigh():
+            return lcm(*moduleDict["hb"]["mod"].highPulse.values())
+            
+        buttonPresses += 1
+
 
 def main(argv):
     noPartOne = False
@@ -225,12 +260,12 @@ def main(argv):
         data = parseInput(file)
 
         if not noPartOne:
-            result = part1(data)
-            print("{} - Part 1: {} Total ratings for all parts  ".format(file, result))
+            result = part1(copy.deepcopy(data))
+            print("{} - Part 1: {} Pulse multiplier  ".format(file, result))
         
         if not noPartTwo:
-            result = part2(data)
-            print("{} - Part 2: {} Total different part combinations ".format(file, result))
+            result = part2(copy.deepcopy(data))
+            print("{} - Part 2: {} Button presses ".format(file, result))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
