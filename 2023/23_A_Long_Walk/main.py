@@ -274,7 +274,7 @@ def main(argv):
         
         if not noPartTwo:
             result = part2(copy.deepcopy(data))
-            print("{} - Part 2: {} Sum of other bricks that fall ".format(file, result))
+            print("{} - Part 2: {} Steps are inte the longest walk".format(file, result))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
