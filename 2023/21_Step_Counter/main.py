@@ -64,8 +64,7 @@ def parseInput(filePath:str):
 
 from queue import Queue
 
-def part1(data):
-    connectivityMatrix, startPlot = data
+def stepsToReachAll(connectivityMatrix, startPlot):
 
     visitedSet = set()
     stepsToFirstReach = {}
@@ -92,6 +91,12 @@ def part1(data):
                     stepsToFirstReach[plot] = stepsToFirstReach[currPlot] + 1
                     nodeQ.put(plot)
 
+    return stepsToFirstReach
+    
+def part1(data):
+    connectivityMatrix, startPlot = data
+
+    stepsToFirstReach = stepsToReachAll(connectivityMatrix, startPlot)
     
     exactSteps = 64
 
@@ -107,7 +112,37 @@ def part1(data):
     return plotCount
 
 def part2(data):
-   return
+    connectivityMatrix, startPlot = data
+
+    stepsToFirstReach = stepsToReachAll(connectivityMatrix, startPlot)
+    
+    # After writeup from
+    # https://github.com/villuna/aoc23/wiki/A-Geometric-solution-to-advent-of-code-2023,-day-21
+    
+    n = 202300
+    w = 65
+    
+    odd = 0
+    even = 0
+    oddCorners = 0
+    evenCorners = 0
+    
+    for k in stepsToFirstReach:
+        steps = stepsToFirstReach[k]
+        
+        if (steps) % 2 == 0:
+            if steps > w:
+                evenCorners += 1
+            
+            even += 1
+        else:
+            if steps > w:
+                oddCorners += 1
+            
+            odd += 1
+    
+    return (n+1)**2 * odd + n**2 * even - (n+1)*oddCorners + n*evenCorners
+
 
 def main(argv):
     noPartOne = False
@@ -143,7 +178,7 @@ def main(argv):
         
         if not noPartTwo:
             result = part2(copy.deepcopy(data))
-            print("{} - Part 2: {} Button presses ".format(file, result))
+            print("{} - Part 2: {} Plots can be reached ".format(file, result))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
