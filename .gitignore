@@ -1,6 +1,9 @@
 # Input data
 *.txt
 
-# Day 2 typescript
+# misc
 node_modules
 dist
+
+*.gv
+*.pdf
