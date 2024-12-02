@@ -59,13 +59,13 @@ def part1(data):
 
 
 def part2(data):
-    validReports = 0
     
-    for r in data:
+    from collections import Counter
+    
+    def computeDiffs(r):
         diffs = []
 
         prevVal = None
-       
         
         for value in r:
             
@@ -78,42 +78,49 @@ def part2(data):
             
             prevVal = value
         
-        # Find index of unsafe entry
-        # Recompute diffs
-        # Find if any breaks again
+        diffs = np.array(diffs)
         
-       
-        from collections import Counter
-    
-    
-        count = Counter(np.sign(diffs))
         
+        return diffs
+    
+    def findWrongIndex(d):
+        i_stepSize = np.where((d < -3) | (d > 3))
+        
+        
+        count = Counter(np.sign(d))
         major_sign = max(count, key=count.get)
         
-        b_sign = True
-        i_sign = -1
-        
-        if len(count.keys()) > 2:
-            b_sign = False
-        
-        if len(count.keys()) == 2:
-            temp = count.keys()
-            
-            for k in temp:
-                if k == major_sign:
-                    continue
-                
-                if count[k] > 1:
-                    b_sign = False
-                    
+        i_sign = np.where(np.sign(d) != major_sign)
 
+        i_wrong = np.append(i_sign, i_stepSize)
+        i_wrong = np.append(i_wrong, i_wrong+1)
         
-        b_range = sum(1 for d in diffs if (d<-3 or d > 3)) <= 1
         
+        return set(i_wrong)   
+    
+    validReports = 0
+    
+    for r in data:
         
-
-        if b_sign and b_range:
+        diffs = computeDiffs(r)
+        
+        i_wrong = findWrongIndex(diffs)
+        
+        if len(i_wrong) == 0:
             validReports += 1
+            continue
+       
+        
+        for i in i_wrong:
+            temp = np.copy(r)
+            temp = np.delete(temp, i)
+            
+            diffs2 = computeDiffs(temp)
+            
+            if not findWrongIndex(diffs2):
+                validReports += 1
+                break
+                
 
     return validReports
 
