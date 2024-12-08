@@ -5,6 +5,7 @@ import re
 from enum import Enum
 import copy
 import queue
+from collections import defaultdict
 np.set_printoptions(threshold=sys.maxsize, linewidth=sys.maxsize)
 
 def readFile(filepath:str):
