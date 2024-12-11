@@ -1,4 +1,5 @@
 import sys, getopt
+import time
 import numpy as np
 import math
 import re
@@ -6,6 +7,7 @@ from enum import Enum
 import copy
 import queue
 from collections import defaultdict
+from functools import cache
 np.set_printoptions(threshold=sys.maxsize, linewidth=sys.maxsize)
 
 def readFile(filepath:str):
@@ -62,12 +64,16 @@ def main(argv):
         data = parseInput(file)
 
         if not noPartOne:
+            s_t = time.perf_counter()
             result = part1(copy.deepcopy(data))
-            print("{} - Part 1: {}".format(file, result))
+            e_t = time.perf_counter()
+            print("{} - Part 1: {} | {:.3}s".format(file, result, e_t - s_t))
         
         if not noPartTwo:
+            s_t = time.perf_counter()
             result = part2(copy.deepcopy(data))
-            print("{} - Part 2: {}".format(file, result))
+            e_t = time.perf_counter()
+            print("{} - Part 2: {} | {:.3}s".format(file, result, e_t - s_t))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
