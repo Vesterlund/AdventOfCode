@@ -116,6 +116,70 @@ class CropPlot():
 
         return perimiter
     
+    def edges(self):
+        edges = 0
+        
+        w = int(self.bounds.imag)
+        h = int(self.bounds.real)
+        inside = [False] * h
+        last_inside = [False] * h
+        
+        for i in range(h):
+            p = i
+            
+            for j in range(w):
+                p += 1j
+                
+                if (p in self.points) != inside[j]:   
+                    inside[j] = not inside[j]
+
+            
+            if inside == last_inside:
+                continue
+            
+            in_block = False
+            
+            diff = [(1 if(a != b and a) else (2 if(a!=b and b) else 0)) for a,b in zip(inside, last_inside)]
+
+            for i, v in enumerate(diff):
+                if v:
+                    if not in_block or diff[i-1] != v:
+                        edges += 1
+                        in_block = True
+                else:
+                    in_block = False
+            
+            last_inside = inside.copy()
+        
+        inside = [False] * w
+
+        for i in range(w):
+            p = i*1j
+            
+            for j in range(h):
+                p += 1
+                
+                if (p in self.points) != inside[j]:
+                    inside[j] = not inside[j]
+            
+            if inside == last_inside:
+                continue
+            
+            in_block = False
+            
+            diff = [(1 if(a != b and a) else (2 if(a!=b and b) else 0)) for a,b in zip(inside, last_inside)]
+
+            for i, v in enumerate(diff):
+                if v:
+                    if not in_block or diff[i-1] != v:
+                        edges += 1
+                        in_block = True
+                else:
+                    in_block = False
+            
+            last_inside = inside.copy()
+            
+        return edges
     
     def price(self):
         return self.area * self.perimiter()
@@ -139,8 +203,14 @@ def part1(data):
 
 
 def part2(data):
+    plots : list[CropPlot] = data
     
-    return 
+    plot_price = 0
+    
+    for p in plots:
+        plot_price += p.edgePrice()
+    
+    return plot_price
     
 
     
