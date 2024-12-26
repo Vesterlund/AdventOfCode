@@ -189,22 +189,131 @@ def part2(data):
     # ====
     keypad_robots = 25
     # ====
+    numpad_map = defaultdict(lambda: defaultdict(list))
+    dirpad_map = defaultdict(lambda: defaultdict(list))
 
+    def numpadPaths(start,end):
+        p_start = keypadmap[start]
+        p_end = keypadmap[end]
 
+        path = p_end - p_start
+        
+        r = int(path.real)
+        i = int(path.imag)
+        
+        h_part = "<" * (-i) if i < 0 else ">"*i
+        v_part = "^"*(-r) if r <0 else "v"*r
+
+        
+        # Om vi kan gå vertikalt först (upp ja, nej beror på)
+        if r < 0 or ((int(p_end.imag) > 0 and int(p_start.imag) > 0) or (int(p_end.real) < 3 and int(p_start.real) < 3)):
+            if r:
+                numpad_map[start][end].append(v_part + h_part)
+        
+        # Om vi kan gå horisontellt först (höger ja, vänster beror på)
+        if  i > 0 or ((int(p_end.imag) > 0 and int(p_start.imag) > 0) or (int(p_end.real) < 3 and int(p_start.real) < 3)):
+            if i :
+                numpad_map[start][end].append(h_part + v_part)
+      
+      
+    p = "0123456789A"
+    
+    for s in p:
+        for e in p:
+            numpadPaths(s,e) 
+
+    def dirpadPaths(s,e):
+        p_start = buttonmap[s]
+        p_end = buttonmap[e]
+
+        path = p_end - p_start
+        
+        r = int(path.real)
+        i = int(path.imag)
+        
+        h_part = "<" * (-i) if i < 0 else ">"*i
+        v_part = "^"*(-r) if r <0 else "v"*r
+        
+        b_insquare = int(p_end.imag) > 0 and int(p_start.imag) > 0
+        
+        if i>= 0 or b_insquare:
+            if r:
+                dirpad_map[s][e].append(h_part + v_part)
+    
+        if r >= 0 or b_insquare:
+            if i:
+                dirpad_map[s][e].append(v_part + h_part)
+
+        if not path:
+            dirpad_map[s][e].append("")
+
+    p = "<^v>A"
+    
+    for s in p:
+        for e in p:
+            dirpadPaths(s,e)
+    
+
+    def buildSeq(keys,index,prevKey,currPath,res):
+        if index == len(keys):
+            res.append(currPath)
+            return
+        for path in dirpad_map[prevKey][keys[index]]:
+            buildSeq(keys, index+1, keys[index], currPath + path + "A", res)
+
+    @cache
+    def shortestSeq(keys,depth):
+        if not depth:
+            return len(keys)
+        
+        sub_keys = [e + "A" if e else "A" for e in keys.split("A") ]
+        sub_keys = sub_keys[:-1]
+        total_seq_length = 0
+        
+        for sk in sub_keys:
+            seq_ins = []
+            buildSeq(sk, 0, "A", "", seq_ins)
+
+            l = []
+            for s in seq_ins:
+                length = shortestSeq(s, depth-1)
+
+                l.append(length)
+            
+            total_seq_length += min(l)
+        
+        return total_seq_length 
+    
+    def buildNumSeq(keys,index,prevKey,currPath,res):
+        
+        if index == len(keys):
+            res.append(currPath)
+            return
+
+        for path in numpad_map[prevKey][keys[index]]:
+            buildNumSeq(keys, index+1, keys[index], currPath + path + "A", res)
+    
+    def solve(code, maxDepth):
+        
+        seq = []
+        buildNumSeq(code,0,"A","", seq)
+        
+        score = []
+        
+        for s in seq:
+            score.append(shortestSeq(s, maxDepth))
+        
+        return min(score)
+    
     total_complexity = 0
+    
     for code in codes:
-        seq = codePath("A" + code)
-        
-        for i in range(keypad_robots):
-            print(f"bot{i}, seqlen: {len(seq)}")
-            seq = dirPath("A" + seq)
-        
-        comp = len(seq)*int(code[:-1])
-
-        print(len(seq), int(code[:-1]), comp)
-
-        total_complexity += comp
-
+        total_complexity += int(code[:-1]) * solve(code, keypad_robots)
+    
+    
+    # Low:
+    # 448592681972
+    
     return total_complexity
 
     
