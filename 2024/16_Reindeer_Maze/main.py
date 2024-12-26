@@ -18,6 +18,8 @@ def readFile(filepath:str):
 
     return fileContent
 
+import networkx as nx
+
 def parseInput(filePath:str):
     fileContent = readFile(filePath)
     data = fileContent.split("\n")
@@ -27,26 +29,59 @@ def parseInput(filePath:str):
     start_pos = 0
     end_pos = 0
     
+    
     for i, row in enumerate(data):
         for j, c in enumerate(row):
+            p = i+j*1j
+            
             if c=="#":
-                walls.add(i+j*1j)
+                walls.add(p)
                 continue
             
+            
             if c=="S":
-                start_pos = i+j*1j
+                start_pos = p
                 continue
             if c =="E":
-                end_pos = i+j*1j
+                end_pos = p
+
+            
+    def makeGraph(graph):
+        R = len(graph)
+        C = len(graph[0])
+        G = nx.DiGraph()
+        for r in range(R):
+            nx.add_path(G, [(r, c, 0) for c in range(C)], weight=1)
+            nx.add_path(G, [(r, c, 2) for c in range(C - 1, -1, -1)], weight=1)
+        for c in range(C):
+            nx.add_path(G, [(r, c, 1) for r in range(R)], weight=1)
+            nx.add_path(G, [(r, c, 3) for r in range(R - 1, -1, -1)], weight=1)
+            
+        for r in range(R):
+            for c in range(C):
+                if graph[r][c] in ".ES":
+                    nx.add_cycle(G, [(r, c, x) for x in range(4)], weight=1000)
+                    nx.add_cycle(G, [(r, c, x) for x in range(3, -1, -1)], weight=1000)
+                if graph[r][c] == "#":
+                    G.remove_nodes_from([(r, c, x) for x in range(4)])
+                if graph[r][c] == "S":
+                    start = r, c, 0
+                if graph[r][c] == "E":
+                    end = r, c
+                    for x in range(4):
+                        G.add_edge((r, c, x), (r, c), weight=0)
+        return G, start, end
+
     
-    return walls, start_pos, end_pos, (len(data), len(data[0]))
+    
+    return walls, start_pos, end_pos, (len(data), len(data[0])), makeGraph(data)
 
 
     
 def part1(data):
-    walls, start_pos, end_pos, shape = data
+    walls, start_pos, end_pos, shape,_ = data
     
-    def printGrid(reached=set()):
+    def printgraph(reached=set()):
         
         for i in range(shape[0]):
             r = ""
@@ -93,7 +128,7 @@ def part1(data):
     
     while not pq.empty():
         
-        #printGrid(reached)
+        #printgraph(reached)
         
         item = pq.get()
         
@@ -136,10 +171,10 @@ def part1(data):
 
 
 def part2(data):
-    walls, start_pos, end_pos, shape = data
+    walls, start_pos, end_pos, shape, graph = data
     from colorama import Fore, Back, Style
     
-    def printGrid(pset=set()):
+    def printgraph(pset=set()):
         for i in range(shape[0]):
             r = ""
             for j in range(shape[1]):
@@ -163,7 +198,7 @@ def part2(data):
                 r+="?"
 
             print(r)
-    def printGridCol(l=[]):
+    def printgraphCol(l=[]):
         
         pset, col = l
         
@@ -190,18 +225,27 @@ def part2(data):
                 r+="?"
 
             print(r)
-
-    import networkx as nx
+    
+    
+        
+    graph,s,e = graph
+    
+    paths = nx.all_shortest_paths(graph, s,e,weight="weight")
+    
+    seats = set()
+    
+    for path in paths:
+        for point in path:
+            p = point[0] + point[1]*1j
+            seats.add(p)
+    
+    
+    return len(seats)
     
     
     
     
-    return
-    
-    
-    
-    
-    printGridCol((reached_set, set_col))
+    printgraphCol((reached_set, set_col))
     # High:
     # 625
     # 624
